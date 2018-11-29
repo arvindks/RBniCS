@@ -20,7 +20,7 @@ import types
 from rbnics.utils.decorators import overload
 
 def compute_theta_for_stability_factor(compute_theta):
-    from rbnics.problems.elliptic import EllipticCoerciveProblem
+    from rbnics.problems.elliptic import EllipticCoerciveProblem, EllipticProblem
     
     module = types.ModuleType("compute_theta_for_stability_factor", "Storage for implementation of compute_theta_for_stability_factor")
     
@@ -32,6 +32,25 @@ def compute_theta_for_stability_factor(compute_theta):
     def _compute_theta_for_stability_factor_impl(self_, term):
         if term == "stability_factor_left_hand_matrix":
             return tuple(0.5*t for t in compute_theta(self_, "a"))
+        else:
+            return compute_theta(self_, term)
+            
+    # Elliptic (non-coercive) problem
+    @overload(EllipticProblem, str, module=module)
+    def _compute_theta_for_stability_factor_impl(self_, term):
+        if term == "stability_factor_left_hand_matrix":
+            def Z(theta, p, q):
+                return theta[p]*theta[q]
+
+            theta_a = compute_theta(self_, "a")
+            Q_a = len(theta_a)
+            theta_z = list()
+            for p in range(Q_a):
+                theta_z.append(sum(- Z(theta_a, p, q) if q != p else Z(theta_a, p, q) for q in range(Q_a)))
+            for p in range(Q_a):
+                for q in range(p + 1, Q_a):
+                    theta_z.append(Z(theta_a, p, q))
+            return tuple(theta_z)
         else:
             return compute_theta(self_, term)
     
